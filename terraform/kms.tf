@@ -49,9 +49,27 @@ resource "google_kms_crypto_key" "app_envelope_key" {
   rotation_period = "7776000s"
 }
 
+# 5. CMEK for GKE Application-Layer Secrets Encryption (etcd)
+resource "google_kms_crypto_key" "gke_etcd_key" {
+  name            = "gke-etcd-cmek"
+  key_ring        = google_kms_key_ring.erp_keyring.id
+  rotation_period = "7776000s"
+
+  lifecycle {
+    prevent_destroy = false
+  }
+}
+
 # Retrieve Google Managed Service Accounts for CMEK Granting
 data "google_project" "project" {
   project_id = var.project_id
+}
+
+# GKE Service Agent Encrypter/Decrypter for etcd encryption
+resource "google_kms_crypto_key_iam_member" "gke_etcd_sa_key_user" {
+  crypto_key_id = google_kms_crypto_key.gke_etcd_key.id
+  role          = "roles/cloudkms.cryptoKeyEncrypterDecrypter"
+  member        = "serviceAccount:service-${data.google_project.project.number}@container-engine-robot.iam.gserviceaccount.com"
 }
 
 # Spanner Service Agent Encrypter/Decrypter

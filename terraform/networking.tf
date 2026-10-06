@@ -7,7 +7,7 @@ resource "google_compute_network" "erp_vpc" {
   depends_on = [google_project_service.enabled_services]
 }
 
-# Primary Subnet for private workloads
+# Primary Subnet for private workloads (with GKE VPC-native secondary ranges for Pods & Services)
 resource "google_compute_subnetwork" "erp_subnet" {
   name                     = "erp-subnet-${var.region}"
   ip_cidr_range            = var.vpc_cidr
@@ -15,11 +15,38 @@ resource "google_compute_subnetwork" "erp_subnet" {
   network                  = google_compute_network.erp_vpc.id
   private_ip_google_access = true
   project                  = var.project_id
+
+  secondary_ip_range {
+    range_name    = "gke-pods-range"
+    ip_cidr_range = var.gke_pods_cidr
+  }
+
+  secondary_ip_range {
+    range_name    = "gke-services-range"
+    ip_cidr_range = var.gke_services_cidr
+  }
 }
 
-# Serverless VPC Access Connector
-# Enables Cloud Run microservices to access Memorystore Redis and other private VPC resources
+# Cloud Router & Cloud NAT for Private GKE Nodes outbound traffic
+resource "google_compute_router" "erp_router" {
+  name    = "erp-router-${var.region}-${var.environment}"
+  region  = var.region
+  network = google_compute_network.erp_vpc.id
+  project = var.project_id
+}
+
+resource "google_compute_router_nat" "erp_nat" {
+  name                               = "erp-nat-${var.region}-${var.environment}"
+  router                             = google_compute_router.erp_router.name
+  region                             = var.region
+  project                            = var.project_id
+  nat_ip_allocate_option             = "AUTO_ONLY"
+  source_subnetwork_ip_ranges_to_nat = "ALL_SUBNETWORKS_ALL_IP_RANGES"
+}
+
+# Serverless VPC Access Connector (only needed when Cloud Run is enabled)
 resource "google_vpc_access_connector" "serverless_connector" {
+  count         = contains(["cloud_run", "hybrid"], var.compute_platform) ? 1 : 0
   name          = "erp-con-${var.environment}"
   region        = var.region
   network       = google_compute_network.erp_vpc.name
@@ -35,7 +62,7 @@ resource "google_vpc_access_connector" "serverless_connector" {
   ]
 }
 
-# Private Service Access for Google Managed Services (Redis peering)
+# Private Service Access for Google Managed Services (Memorystore Redis peering)
 resource "google_compute_global_address" "private_service_access_ip" {
   name          = "erp-private-service-access"
   purpose       = "VPC_PEERING"

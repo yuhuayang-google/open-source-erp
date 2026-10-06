@@ -9,6 +9,17 @@ variable "region" {
   default     = "us-central1"
 }
 
+variable "compute_platform" {
+  description = "Target computing infrastructure: 'gke' (GKE Autopilot cluster), 'cloud_run' (Serverless containers), or 'hybrid' (both GKE and Cloud Run)"
+  type        = string
+  default     = "gke"
+
+  validation {
+    condition     = contains(["gke", "cloud_run", "hybrid"], var.compute_platform)
+    error_message = "compute_platform must be one of: 'gke', 'cloud_run', or 'hybrid'."
+  }
+}
+
 variable "spanner_config" {
   description = "Cloud Spanner instance configuration (e.g., regional-us-central1, nam3, or multi-region)"
   type        = string
@@ -33,8 +44,26 @@ variable "vpc_cidr" {
   default     = "10.10.0.0/20"
 }
 
+variable "gke_pods_cidr" {
+  description = "Secondary CIDR block for GKE Autopilot/Standard Pods (VPC-native alias IPs)"
+  type        = string
+  default     = "10.100.0.0/14"
+}
+
+variable "gke_services_cidr" {
+  description = "Secondary CIDR block for GKE ClusterIP Services"
+  type        = string
+  default     = "10.104.0.0/20"
+}
+
+variable "gke_master_ipv4_cidr" {
+  description = "CIDR block (/28) for the GKE private control plane"
+  type        = string
+  default     = "172.16.0.0/28"
+}
+
 variable "vpc_connector_cidr" {
-  description = "CIDR block (/28 required) for the Serverless VPC Access connector"
+  description = "CIDR block (/28 required) for the Serverless VPC Access connector (used when compute_platform is 'cloud_run' or 'hybrid')"
   type        = string
   default     = "10.10.16.0/28"
 }

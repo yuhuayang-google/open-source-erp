@@ -35,7 +35,8 @@ locals {
     "bigquery.googleapis.com",
     "storage.googleapis.com",
     "redis.googleapis.com",
-    "run.googleapis.com",
+    "container.googleapis.com",      # Google Kubernetes Engine (GKE)
+    "run.googleapis.com",            # Cloud Run v2
     "vpcaccess.googleapis.com",
     "compute.googleapis.com",
     "documentai.googleapis.com",

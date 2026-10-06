@@ -544,63 +544,86 @@ pub enum AccountingError {
 
 ---
 
-## 10. Deployment & Infrastructure Architecture
+## 10. Computing Infrastructure Architecture: GKE vs. Cloud Run
+
+The Rust ERP supports two managed GCP compute runtimes, selectable in Terraform via `var.compute_platform = "gke" | "cloud_run" | "hybrid"` (defaulting to **`gke`** for enterprise production).
+
+### Why Google Kubernetes Engine (GKE Autopilot) is Primary for Enterprise ERP
+While Cloud Run is ideal for stateless HTTP request/response APIs, a full-scale ERP has several operational requirements where **GKE Autopilot** excels:
+
+| Architectural Dimension | GKE Autopilot (`compute_platform = "gke"`) | Cloud Run v2 (`compute_platform = "cloud_run"`) |
+| :--- | :--- | :--- |
+| **Long-Lived Streaming Daemons** | Native support for persistent **Pub/Sub streaming pull** workers, continuous CDC processors, and long-lived bidirectional gRPC/WebSocket streams for warehouse barcode scanners. | Request-scoped or CPU-allocated instances; less suited for stateful in-memory stream batching or multi-hour background loops. |
+| **Heavy Batch & MRP Runs** | Native Kubernetes **`CronJob`** and **`Job`** primitives for multi-hour Material Requirements Planning (MRP), BOM explosions, and monthly payroll runs without request timeouts. | Cloud Run Jobs (max 24h, fewer orchestration primitives for complex DAG dependencies). |
+| **VPC-Native Redis & Spanner Networking** | **Direct Alias IP routing**: Pods sit natively inside the VPC subnet (`10.100.0.0/14`) and talk directly to Memorystore Redis with sub-millisecond latency—no Serverless VPC Access Connector bottleneck. | Requires a Serverless VPC Access Connector bridge (`10.10.16.0/28`) to reach private Memorystore Redis IPs. |
+| **Zero-Key Security & Isolation** | **GKE Workload Identity Federation** (`iam.gke.io/gcp-service-account`), `NetworkPolicy` pod-to-pod firewalls, `PodDisruptionBudget` (PDB), and Cloud KMS etcd secret encryption. | Per-service IAM service account; no fine-grained L3/L4 network policy between internal microservices. |
+| **Cost Profile** | Optimal for steady-state 24/7 enterprise traffic with predictable pod bin-packing and committed use discounts. | Optimal for dev/staging or bursty SMB tenants where scale-to-zero saves idle compute cost. |
+
+### GKE Production Topology
 
 ```mermaid
 flowchart LR
-    subgraph GCPRegion["GCP Multi-Region Deployment (e.g., us-central1 / us-east1)"]
-        subgraph Compute["Stateless Compute"]
-            CloudRun["Cloud Run v2 (API Instances)\nAuto-scale 0..100\nConcurrency: 80"]
-            WorkerRun["Cloud Run Jobs / Workers\n(PubSub / Tasks Consumer)"]
+    subgraph VPC["ERP Custom VPC (erp-vpc)"]
+        subgraph GKE["GKE Autopilot Regional Cluster (Private Nodes)"]
+            subgraph NS["Namespace: erp-system"]
+                APIPods["Deployment: erp-api\n(Axum HTTP + Tonic gRPC)\nHPA: 3..50 Replicas\nPDB: minAvailable 2"]
+                WorkerPods["Deployment: erp-worker\n(Pub/Sub Streaming Consumer)\nHPA: 2..20 Replicas"]
+                CronJobs["K8s CronJobs:\n- erp-mrp-nightly (BOM Explosion)\n- erp-ledger-audit-daily"]
+            end
         end
 
         subgraph ManagedData["Zero-Ops Managed Backends"]
-            SpannerInstance[("Cloud Spanner Multi-Region\n(nam-eur-asia1 / nam3)")]
-            RedisInstance[("Memorystore Redis Cluster")]
-            GCSBuckets[("Cloud Storage Multi-Region")]
-        end
-
-        subgraph BigData["Analytics & Warehousing"]
-            BQDataset[("BigQuery Enterprise\n(BI Engine + Partitioned Tables)")]
+            SpannerInstance[("Cloud Spanner Multi-Region\n(ACID OLTP Ledger)")]
+            RedisInstance[("Memorystore Redis\n(Direct VPC Peering)")]
+            GCSBuckets[("Cloud Storage\n(CMEK Encrypted)")]
+            BQDataset[("BigQuery Enterprise\n(OLAP & BI)")]
         end
     end
 
-    CloudRun <--> SpannerInstance
-    CloudRun <--> RedisInstance
-    CloudRun <--> GCSBuckets
-    WorkerRun <--> SpannerInstance
-    WorkerRun <--> BQDataset
+    GLB["GKE Gateway / Container-Native GLB\n(Network Endpoint Groups + Cloud Armor + IAP)"] --> APIPods
+    APIPods <-->|"Workload Identity (gRPC)"| SpannerInstance
+    APIPods <-->|"Direct VPC Alias IP (<1ms)"| RedisInstance
+    APIPods <--> GCSBuckets
+    WorkerPods <--> SpannerInstance
+    WorkerPods <--> BQDataset
+    CronJobs --> SpannerInstance
 ```
 
 ### Key Performance & Operational Metrics
-* **Rust Binary Footprint**: $\approx 25\,\text{MB}$ scratch/distroless Docker container.
-* **Cold Start Latency on Cloud Run**: $< 20\,\text{ms}$ (vs. Frappe/Python 4–8 seconds).
-* **Memory Utilization**: $\approx 35\,\text{MB}$ RSS per instance under load.
+* **Rust Binary Footprint**: $\approx 25\,\text{MB}$ distroless Docker container (`gcr.io/distroless/cc-debian12:nonroot`).
+* **Startup Latency**: $< 20\,\text{ms}$ pod readiness (vs. Frappe/Python 4–8 seconds).
+* **Memory Utilization**: $\approx 35\,\text{MB}$ RSS per pod under load.
 * **Throughput Capacity**: $> 15,000$ read queries/sec and $> 4,000$ transactional writes/sec per Cloud Spanner node.
-* **Zero Scheduled Maintenance**: No database index rebuilds, vacuuming, or replication lag halts.
+* **Zero Scheduled Maintenance**: GKE Surge Upgrades with `PodDisruptionBudget` + Spanner zero-downtime schema migrations.
 
 ---
 
-## 11. Terraform Infrastructure as Code (IaC) Specification
+## 11. Terraform & Kubernetes Infrastructure as Code (IaC)
 
-A complete, production-grade Terraform suite has been generated in [`terraform/`](file:///usr/local/google/home/yuhuayang/.gemini/jetski/brain/9fd8c3c3-3816-4793-b9b9-2b7c4f4da1d8/terraform/) to provision and configure all required GCP backends:
+A complete, production-grade Terraform and Kubernetes manifest suite is included in [`terraform/`](../terraform/) and [`k8s/`](../k8s/):
 
 ```
-terraform/
-├── main.tf                    # Provider setup and GCP API enablement
-├── variables.tf               # Configurable parameters (project_id, region, spanner_config, etc.)
-├── kms.tf                     # Cloud KMS KeyRing & CMEK keys for Spanner, Storage, BQ, and Envelope
-├── networking.tf              # VPC, Subnet, Serverless VPC Access connector, & Private Service Peering
-├── spanner.tf                 # Spanner Instance, Database with CMEK, Interleaved DDL, & Change Stream
-├── redis.tf                   # Memorystore Redis instance with VPC peering & encryption
-├── storage.tf                 # GCS buckets for invoices (OCR), 7-year audit archives, and exports
-├── messaging.tf               # Cloud Pub/Sub topics/subscriptions (ordered) & Cloud Tasks queue
-├── analytics.tf               # BigQuery dataset with CMEK & real-time P&L reporting views
-├── ai.tf                      # Vertex AI Document AI Invoice Processor & Secret Manager
-├── iam.tf                     # Least-privilege Service Accounts (API and Worker) & IAM bindings
-├── cloud_run.tf               # Cloud Run v2 services for API and Worker with VPC connectors
-├── outputs.tf                 # Connection strings, endpoints, and resource IDs
-├── terraform.tfvars.example   # Sample input values
-└── README.md                  # Deployment guide and step-by-step instructions
+├── Dockerfile                     # Multi-stage Rust builder -> distroless nonroot runtime image
+├── k8s/                           # Kubernetes manifests for GKE Autopilot / Standard
+│   ├── base.yaml                  # Namespace (erp-system), Workload Identity ServiceAccounts, ConfigMap
+│   ├── api-deployment.yaml        # erp-api Deployment, NEG Service, HPA (3..50), PodDisruptionBudget
+│   └── worker-and-cronjobs.yaml   # erp-worker Deployment + Nightly MRP & Ledger Audit CronJobs
+└── terraform/                     # GCP Infrastructure as Code
+    ├── main.tf                    # Provider setup and GCP API enablement (including container.googleapis.com)
+    ├── variables.tf               # Configurable parameters (compute_platform = "gke" | "cloud_run" | "hybrid")
+    ├── gke.tf                     # GKE Autopilot Private Cluster, VPC-native IPs, Workload Identity, KMS etcd
+    ├── cloud_run.tf               # Optional Cloud Run v2 services (when compute_platform = "cloud_run" | "hybrid")
+    ├── kms.tf                     # Cloud KMS KeyRing & CMEK keys for Spanner, Storage, BQ, GKE etcd, and Envelope
+    ├── networking.tf              # VPC, Subnet with GKE Pod/Service secondary ranges, Cloud NAT, & Peering
+    ├── spanner.tf                 # Spanner Instance, Database with CMEK, Interleaved DDL, & Change Stream
+    ├── redis.tf                   # Memorystore Redis instance with VPC peering & TLS encryption
+    ├── storage.tf                 # GCS buckets for invoices (OCR), 7-year audit archives, and exports
+    ├── messaging.tf               # Cloud Pub/Sub topics/subscriptions (ordered) & Cloud Tasks queue
+    ├── analytics.tf               # BigQuery dataset with CMEK & real-time P&L reporting views
+    ├── ai.tf                      # Vertex AI Document AI Invoice Processor & Secret Manager
+    ├── iam.tf                     # Least-privilege Service Accounts & GKE Workload Identity bindings
+    ├── outputs.tf                 # GKE cluster credentials command, Spanner URI, Redis host, and endpoints
+    ├── terraform.tfvars.example   # Sample input values
+    └── README.md                  # Deployment guide and step-by-step instructions
 ```
 

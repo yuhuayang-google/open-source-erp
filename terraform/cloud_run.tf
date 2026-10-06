@@ -2,6 +2,7 @@
 
 # 1. Rust API Service (Axum / Tonic HTTP/gRPC)
 resource "google_cloud_run_v2_service" "erp_api" {
+  count    = contains(["cloud_run", "hybrid"], var.compute_platform) ? 1 : 0
   name     = "erp-api-${var.environment}"
   location = var.region
   project  = var.project_id
@@ -15,7 +16,7 @@ resource "google_cloud_run_v2_service" "erp_api" {
     }
 
     vpc_access {
-      connector = google_vpc_access_connector.serverless_connector.id
+      connector = google_vpc_access_connector.serverless_connector[0].id
       egress    = "PRIVATE_RANGES_ONLY"
     }
 
@@ -94,6 +95,7 @@ resource "google_cloud_run_v2_service" "erp_api" {
 
 # 2. Rust Worker Service (Async Pub/Sub Consumer & Cloud Tasks Processor)
 resource "google_cloud_run_v2_service" "erp_worker" {
+  count    = contains(["cloud_run", "hybrid"], var.compute_platform) ? 1 : 0
   name     = "erp-worker-${var.environment}"
   location = var.region
   project  = var.project_id
@@ -107,7 +109,7 @@ resource "google_cloud_run_v2_service" "erp_worker" {
     }
 
     vpc_access {
-      connector = google_vpc_access_connector.serverless_connector.id
+      connector = google_vpc_access_connector.serverless_connector[0].id
       egress    = "PRIVATE_RANGES_ONLY"
     }
 

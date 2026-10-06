@@ -1,0 +1,42 @@
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: erp-system
+  labels:
+    app.kubernetes.io/part-of: rust-erp
+    environment: prod
+---
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: erp-api-ksa
+  namespace: erp-system
+  annotations:
+    # Binds this Kubernetes ServiceAccount to the GCP IAM ServiceAccount via GKE Workload Identity
+    iam.gke.io/gcp-service-account: erp-api-prod@YOUR_PROJECT_ID.iam.gserviceaccount.com
+---
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: erp-worker-ksa
+  namespace: erp-system
+  annotations:
+    iam.gke.io/gcp-service-account: erp-worker-prod@YOUR_PROJECT_ID.iam.gserviceaccount.com
+---
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: erp-config
+  namespace: erp-system
+data:
+  ENVIRONMENT: "prod"
+  PROJECT_ID: "YOUR_PROJECT_ID"
+  SPANNER_DATABASE: "projects/YOUR_PROJECT_ID/instances/erp-spanner-prod/databases/erp_core_db"
+  REDIS_HOST: "10.10.0.5"
+  REDIS_PORT: "6379"
+  PUBSUB_EVENTS_TOPIC: "projects/YOUR_PROJECT_ID/topics/erp-domain-events-prod"
+  PUBSUB_SUBSCRIPTION: "projects/YOUR_PROJECT_ID/subscriptions/erp-worker-sub-prod"
+  TASKS_QUEUE_ID: "projects/YOUR_PROJECT_ID/locations/us-central1/queues/erp-async-queue-prod"
+  BIGQUERY_DATASET: "erp_analytics_prod"
+  GCS_INVOICES_BUCKET: "erp-invoices-incoming"
+  GCS_ARCHIVE_BUCKET: "erp-docs-archive"

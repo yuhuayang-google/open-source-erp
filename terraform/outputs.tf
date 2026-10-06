@@ -1,5 +1,26 @@
 # Deployment Outputs for the Rust ERP Stack
 
+output "compute_platform" {
+  description = "Selected computing platform ('gke', 'cloud_run', or 'hybrid')"
+  value       = var.compute_platform
+}
+
+output "gke_cluster_name" {
+  description = "GKE Autopilot cluster name (when compute_platform is 'gke' or 'hybrid')"
+  value       = length(google_container_cluster.erp_gke) > 0 ? google_container_cluster.erp_gke[0].name : null
+}
+
+output "gke_cluster_endpoint" {
+  description = "GKE Autopilot control plane endpoint"
+  value       = length(google_container_cluster.erp_gke) > 0 ? google_container_cluster.erp_gke[0].endpoint : null
+  sensitive   = true
+}
+
+output "gke_get_credentials_command" {
+  description = "Command to configure kubectl credentials for the GKE cluster"
+  value       = length(google_container_cluster.erp_gke) > 0 ? "gcloud container clusters get-credentials ${google_container_cluster.erp_gke[0].name} --region ${var.region} --project ${var.project_id}" : null
+}
+
 output "spanner_instance_name" {
   description = "Cloud Spanner instance name"
   value       = google_spanner_instance.erp_spanner.name
@@ -55,12 +76,12 @@ output "document_ai_processor_id" {
   value       = google_document_ai_processor.invoice_processor.id
 }
 
-output "api_service_url" {
-  description = "Cloud Run API Service URL"
-  value       = google_cloud_run_v2_service.erp_api.uri
+output "cloud_run_api_service_url" {
+  description = "Cloud Run API Service URL (when compute_platform is 'cloud_run' or 'hybrid')"
+  value       = length(google_cloud_run_v2_service.erp_api) > 0 ? google_cloud_run_v2_service.erp_api[0].uri : null
 }
 
-output "worker_service_url" {
-  description = "Cloud Run Worker Service URL"
-  value       = google_cloud_run_v2_service.erp_worker.uri
+output "cloud_run_worker_service_url" {
+  description = "Cloud Run Worker Service URL (when compute_platform is 'cloud_run' or 'hybrid')"
+  value       = length(google_cloud_run_v2_service.erp_worker) > 0 ? google_cloud_run_v2_service.erp_worker[0].uri : null
 }

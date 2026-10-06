@@ -64,3 +64,20 @@ resource "google_project_iam_member" "worker_roles" {
   role     = each.value
   member   = "serviceAccount:${google_service_account.worker_sa.email}"
 }
+
+# GKE Workload Identity Federation Bindings
+# Allows Kubernetes ServiceAccount 'erp-api-ksa' in namespace 'erp-system' to act as 'api_sa'
+resource "google_service_account_iam_member" "gke_api_workload_identity" {
+  count              = contains(["gke", "hybrid"], var.compute_platform) ? 1 : 0
+  service_account_id = google_service_account.api_sa.name
+  role               = "roles/iam.workloadIdentityUser"
+  member             = "serviceAccount:${var.project_id}.svc.id.goog[erp-system/erp-api-ksa]"
+}
+
+# Allows Kubernetes ServiceAccount 'erp-worker-ksa' in namespace 'erp-system' to act as 'worker_sa'
+resource "google_service_account_iam_member" "gke_worker_workload_identity" {
+  count              = contains(["gke", "hybrid"], var.compute_platform) ? 1 : 0
+  service_account_id = google_service_account.worker_sa.name
+  role               = "roles/iam.workloadIdentityUser"
+  member             = "serviceAccount:${var.project_id}.svc.id.goog[erp-system/erp-worker-ksa]"
+}
