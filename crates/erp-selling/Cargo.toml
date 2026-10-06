@@ -1,0 +1,16 @@
+[package]
+name = "erp-selling"
+version = "0.1.0"
+edition = "2021"
+description = "Sales Management, Customers, Quotations, Sales Orders, and Delivery Notes for Rust ERP"
+
+[dependencies]
+erp-core = { workspace = true }
+erp-stock = { workspace = true }
+erp-accounts = { workspace = true }
+rust_decimal = { workspace = true }
+serde = { workspace = true }
+serde_json = { workspace = true }
+uuid = { workspace = true }
+chrono = { workspace = true }
+thiserror = { workspace = true }

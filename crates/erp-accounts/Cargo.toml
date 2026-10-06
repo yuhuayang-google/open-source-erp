@@ -1,0 +1,14 @@
+[package]
+name = "erp-accounts"
+version = "0.1.0"
+edition = "2021"
+description = "Financial Accounting, Chart of Accounts, General Ledger, and Invoicing for Rust ERP"
+
+[dependencies]
+erp-core = { workspace = true }
+rust_decimal = { workspace = true }
+serde = { workspace = true }
+serde_json = { workspace = true }
+uuid = { workspace = true }
+chrono = { workspace = true }
+thiserror = { workspace = true }

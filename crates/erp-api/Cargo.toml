@@ -1,0 +1,22 @@
+[package]
+name = "erp-api"
+version = "0.1.0"
+edition = "2021"
+description = "Axum REST & gRPC API server for Rust ERP on Cloud Run"
+
+[dependencies]
+erp-core = { workspace = true }
+erp-accounts = { workspace = true }
+erp-stock = { workspace = true }
+erp-selling = { workspace = true }
+erp-buying = { workspace = true }
+erp-events = { workspace = true }
+axum = { workspace = true }
+tokio = { workspace = true }
+tower-http = { workspace = true }
+tracing = { workspace = true }
+tracing-subscriber = { workspace = true }
+serde = { workspace = true }
+serde_json = { workspace = true }
+uuid = { workspace = true }
+chrono = { workspace = true }

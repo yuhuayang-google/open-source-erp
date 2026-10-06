@@ -1,0 +1,14 @@
+[package]
+name = "erp-events"
+version = "0.1.0"
+edition = "2021"
+description = "Cloud Pub/Sub domain events, event envelope, and publisher/subscriber interfaces for Rust ERP"
+
+[dependencies]
+erp-core = { workspace = true }
+serde = { workspace = true }
+serde_json = { workspace = true }
+uuid = { workspace = true }
+chrono = { workspace = true }
+thiserror = { workspace = true }
+async-trait = { workspace = true }

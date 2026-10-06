@@ -1,0 +1,13 @@
+[package]
+name = "erp-core"
+version = "0.1.0"
+edition = "2021"
+description = "Core domain types, Money, UOM, DocStatus, and shared traits for the Rust ERP"
+
+[dependencies]
+rust_decimal = { workspace = true }
+serde = { workspace = true }
+serde_json = { workspace = true }
+uuid = { workspace = true }
+chrono = { workspace = true }
+thiserror = { workspace = true }

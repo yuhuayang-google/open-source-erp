@@ -1,0 +1,16 @@
+[package]
+name = "erp-buying"
+version = "0.1.0"
+edition = "2021"
+description = "Procurement, Suppliers, Purchase Orders, and Purchase Receipts for Rust ERP"
+
+[dependencies]
+erp-core = { workspace = true }
+erp-stock = { workspace = true }
+erp-accounts = { workspace = true }
+rust_decimal = { workspace = true }
+serde = { workspace = true }
+serde_json = { workspace = true }
+uuid = { workspace = true }
+chrono = { workspace = true }
+thiserror = { workspace = true }

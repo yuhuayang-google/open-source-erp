@@ -1,0 +1,14 @@
+[package]
+name = "erp-stock"
+version = "0.1.0"
+edition = "2021"
+description = "Inventory, Item Master, Perpetual Stock Ledger, and Valuation (FIFO / Moving Average) for Rust ERP"
+
+[dependencies]
+erp-core = { workspace = true }
+rust_decimal = { workspace = true }
+serde = { workspace = true }
+serde_json = { workspace = true }
+uuid = { workspace = true }
+chrono = { workspace = true }
+thiserror = { workspace = true }

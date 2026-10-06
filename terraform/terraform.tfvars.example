@@ -1,0 +1,15 @@
+# Example Terraform Variables for Rust ERP Deployment
+
+project_id               = "your-gcp-project-id"
+region                   = "us-central1"
+spanner_config           = "regional-us-central1" # Or "nam3" for multi-region high availability
+spanner_processing_units = 1000                   # 1000 PU = 1 Spanner Node (use 100 for dev)
+environment              = "prod"
+
+vpc_cidr           = "10.10.0.0/20"
+vpc_connector_cidr = "10.10.16.0/28"
+
+redis_memory_size_gb = 2
+
+api_container_image    = "gcr.io/your-gcp-project-id/erp-api:latest"
+worker_container_image = "gcr.io/your-gcp-project-id/erp-worker:latest"

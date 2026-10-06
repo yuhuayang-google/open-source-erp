@@ -1,0 +1,35 @@
+[workspace]
+resolver = "2"
+members = [
+    "crates/erp-core",
+    "crates/erp-accounts",
+    "crates/erp-stock",
+    "crates/erp-selling",
+    "crates/erp-buying",
+    "crates/erp-events",
+    "crates/erp-api",
+]
+
+[workspace.dependencies]
+rust_decimal = { version = "1.36", features = ["serde-with-str"] }
+serde = { version = "1.0", features = ["derive"] }
+serde_json = "1.0"
+uuid = { version = "1.10", features = ["v4", "v7", "serde"] }
+chrono = { version = "0.4", features = ["serde"] }
+thiserror = "1.0"
+anyhow = "1.0"
+tokio = { version = "1.40", features = ["full"] }
+tracing = "0.1"
+tracing-subscriber = { version = "0.3", features = ["json", "env-filter"] }
+axum = { version = "0.7", features = ["json", "macros"] }
+tower = "0.5"
+tower-http = { version = "0.5", features = ["trace", "cors"] }
+async-trait = "0.1"
+
+# Internal crates
+erp-core = { path = "crates/erp-core" }
+erp-accounts = { path = "crates/erp-accounts" }
+erp-stock = { path = "crates/erp-stock" }
+erp-selling = { path = "crates/erp-selling" }
+erp-buying = { path = "crates/erp-buying" }
+erp-events = { path = "crates/erp-events" }
